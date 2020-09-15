@@ -1,0 +1,137 @@
+---
+title: "Motor Trend"
+author: "Vimal Simha"
+output: pdf_document
+---
+
+
+### Executive Summary
+We analyse data for 32 automobiles to determine whether manual or automatic transmission is more fuel efficient, and to determine the best precitors for fuel efficiency. Automobiles with manual transmission appear to be more fuel efficient than those with automatic transmission. However, the 7.2 mpg difference in fuel efficiency between automobiles with automatic transmission and manual transmission in this sample is fully explained by other factors like automobile weight. At fixed automobile weight, there is no difference in fuel efficiency between vehicles with manual and automatic transmission. Fuel efficiency is principally determined by automobile weight and the number of cylinders: each ton of additional weight reduces fuel efficiency by 6.4 miles per gallon (mpg) and each additional cylinder reduces fuel efficiency by 1.5 mpg.
+
+### Exploratory Analysis
+
+```{r fig.width=3, fig.height=1.5, echo=FALSE}
+library(ggplot2)
+
+g <- ggplot(data = mtcars, aes(y = mpg, x = factor(am), fill = factor(am)))
+g <- g + geom_violin(colour = "black", size = 0.7)
+g <- g + xlab("Transmission Type") + ylab("MPG")
+g <- g + scale_fill_discrete(name="Transmission Type",
+                         breaks=c("0", "1"),
+                         labels=c("Automatic", "Manual"))
+g <- g + theme(axis.ticks = element_blank(), axis.text.x = element_blank())
+
+g
+```
+
+The above figure shows the range of mpg values for manual and automatic transmission. We perform a linear regression with fuel efficiency (mpg) as outcome and transmission mechanism as predictor, finding that the mean fuel efficiency for vehicles with manual transmission is 24.4 mpg compared to 17.2 mpg for vehicles with automatic transmission, and the difference is statistically significant as evidenced by a t-test p-value less than 0.05.
+
+### Including Other Variables
+
+However, this analysis disregards the effect of other factors that affect fuel efficiency besides transmission mechanism. In the appendix, we show the correlations between fuel efficiency and all other parameters in our dataset. The most strongly correlated variable is vehicle weight, so we fit a linear regression model with fuel efficiency (mpg) as outcome, transmission mechanism as predictor and weight as confounder.
+
+```{r}
+summary(lm(mpg ~ factor(am) + wt, data = mtcars))$coeff
+```
+
+At fixed weight, transmission mechanism has no effect on fuel efficiency as indicated by our p-value of 0.99. 
+
+```{r fig.width=3.5, fig.height=2, echo=FALSE}
+g <- ggplot(data = mtcars, aes(x = wt, y = mpg, colour = factor(am)))
+g = g + geom_point(size = 5, colour = "black") + geom_point(size = 4)
+g = g + xlab("Weight in 1000 lb") + ylab("Fuel Efficiency (mpg)")
+g <- g + scale_colour_discrete(name="Transmission Type",
+                         breaks=c("0", "1"),
+                         labels=c("Automatic", "Manual"))
+fit <- lm(mtcars$mpg ~ mtcars$wt)
+g <- g + geom_abline(intercept=coef(fit)[1], slope=coef(fit)[2])
+#g <- g + geom_abline(intercept=coef(fit)[1]+coef(fit)[3], slope=coef(fit)[2] + coef(fit)[4])
+g
+```
+
+High weight automatic transmission vehicles and low weight manual transmission vehicles are outliers with higher than average fuel efficiency. In our dataset, low weight vehicles have manual transmission and high weight vehicles have automatic transmission, so we do not fit separate lines for either type of transmission.
+
+### Identifying Predictors of Fuel Efficiency
+
+We identify the quantities that best predict fuel efficiency. We use a nested likelihood ratio test for model selection. We start with a simple model that uses the variable that is most strongly correlated (or anti-correlated) with fuel efficiency (mpg) as predictor, and successively add variables in order of their absolute value of correlation with fuel efficiency (mpg).
+
+We find that weight and the number of cylinders are predictors of fuel efficiency (mpg), and other variables are not necessary to explain the variation in fuel efficiency at 95\% confidence.
+
+```{r}
+summary(fit <- lm(mpg ~ wt + cyl, data = mtcars))$coeff
+```
+
+Each ton of additional weight reduces fuel efficiency by 6.4 mpg and each additional cylinder reduces fuel efficiency by 1.5 mpg.
+
+## Residuals
+
+```{r fig.width=4, fig.height=2.5, echo=FALSE}
+fit <- lm(mtcars$mpg ~ mtcars$wt + mtcars$cyl)
+res <- resid(fit)
+g <- ggplot(data = mtcars, aes(x = mpg, y = res))
+g = g + geom_point(size = 5, colour = "black") + geom_point(size = 4)
+g = g + ylab("Residuals") + xlab("Fuel Efficiency (mpg)")
+g
+```
+
+Our model residuals, plotted against fuel efficiency (mpg) do not show any discernable pattern. We also show leverage and PRESS residuals in the Appendix which reinforce our conclusion. 
+
+### APPENDIX
+
+## Correlations
+
+Correlation between fuel efficiency and other variables
+
+```{r}
+cor(mtcars)[,1]
+```
+
+## Single Variable Regression Model
+
+We perform a linear regression with fuel efficiency (mpg) as outcome and transmission mechanism as predictor.
+
+```{r}
+summary(lm(mpg ~ factor(am), data = mtcars))$coeff
+```
+
+## Nested Likelihood Ratio Test
+
+```{r}
+fit1 <- lm(mpg ~ wt, data = mtcars)
+fit2 <- update(fit, mpg ~ wt + cyl, data = mtcars)
+fit3 <- update(fit, mpg ~ wt + cyl + disp, data = mtcars)
+fit4 <- update (fit, mpg ~ wt + cyl + disp + hp, data = mtcars)
+fit5 <- update (fit, mpg ~ wt + cyl + disp + hp + drat, data = mtcars)
+fit6 <- update (fit, mpg ~ wt + cyl + disp + hp + drat + vs, data = mtcars)
+fit7 <- update (fit, mpg ~ wt + cyl + disp + hp + drat + vs + am , data = mtcars)
+fit8 <- update (fit, mpg ~ wt + cyl + disp + hp + drat + vs + am + carb, data = mtcars)
+fit9 <- update (fit, mpg ~ wt + cyl + disp + hp + drat + vs + am + carb + gear, data = mtcars)
+fit10 <- update (fit, mpg ~ wt + cyl + disp + hp + drat + vs + am + carb + gear + qsec, data = mtcars)
+anova(fit1,fit2,fit3,fit4,fit5, fit6, fit7, fit8, fit9,fit10)
+```
+
+## Residual Analysis
+
+The figure below shows a plot of leverage against fuel efficiency (mpg) for our best model.
+
+```{r fig.width=4, fig.height=2.5, echo=FALSE}
+fit <- lm(mtcars$mpg ~ mtcars$wt + mtcars$cyl)
+res <- resid(fit)
+hatvals <- hatvalues(fit)
+g <- ggplot(data = mtcars, aes(x = mpg, y = hatvals))
+g = g + geom_point(size = 5, colour = "black") + geom_point(size = 4)
+g = g + ylab("Leverage") + xlab("Fuel Efficiency (mpg)")
+g
+```
+
+The figure below shows a plot of influence, as measured by PRESS residuals, the difference in the response and the predicted response at each data point, where it was not included in the model fitting, against fuel efficiency (mpg) for our best model.
+
+```{r fig.width=4, fig.height=2.5, echo=FALSE}
+fit <- lm(mtcars$mpg ~ mtcars$wt + mtcars$cyl)
+pres <- resid(fit) / (1 - hatvalues(fit))
+g <- ggplot(data = mtcars, aes(x = mpg, y = pres))
+g = g + geom_point(size = 5, colour = "black") + geom_point(size = 4)
+g = g + ylab("Influence (PRESS residuals)") + xlab("Fuel Efficiency (mpg)")
+g
+```
+
